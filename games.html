@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BudStrong - Games</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .games-hero {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: white;
+            text-align: center;
+            padding: 2.5rem 0 1.5rem;
+        }
+        .games-hero h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, #fff, #e0e0ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .games-hero p {
+            font-size: 1.1rem;
+            opacity: 0.85;
+        }
+
+        .emulator-section {
+            max-width: 900px;
+            margin: 2rem auto;
+            padding: 0 20px;
+        }
+
+        .emulator-wrapper {
+            background: #111;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
+            border: 2px solid #333;
+        }
+
+        .emulator-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .emulator-header h2 {
+            color: #fff;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .emulator-header .game-badge {
+            background: var(--primary-red);
+            color: white;
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* EmulatorJS container — 4:3 aspect ratio, fills the wrapper */
+        #game {
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 3px solid #222;
+        }
+
+        .controls-guide {
+            margin-top: 24px;
+            background: #1a1a1a;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #333;
+        }
+        .controls-guide h3 {
+            color: #fff;
+            font-size: 1rem;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 8px;
+        }
+        .control-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 10px;
+            background: #222;
+            border-radius: 6px;
+            border: 1px solid #333;
+        }
+        .control-item kbd {
+            background: #333;
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            color: #fff;
+            min-width: 28px;
+            text-align: center;
+            box-shadow: 0 2px 0 #222;
+        }
+        .control-item span {
+            color: #aaa;
+            font-size: 0.8rem;
+        }
+
+        @media (max-width: 768px) {
+            .games-hero h1 { font-size: 1.8rem; }
+            .emulator-wrapper { padding: 12px; border-radius: 12px; }
+            .controls-guide { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container navbar-content">
+            <div class="logo-section">
+                <img src="assets/images/logo.png" alt="BudStrong Logo" class="logo-img">
+                <span class="logo-text">BudStrong</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="bracelets.html">Bracelets</a></li>
+                <li><a href="about.html">About</a></li>
+                <li><a href="treatment.html">Treatment Journey</a></li>
+                <li><a href="contact.html">Contact</a></li>
+                <li><a href="games.html" class="active">Games</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="games-hero">
+        <div class="container">
+            <h1>&#127918; Arcade</h1>
+            <p>Take a break and enjoy some retro gaming</p>
+        </div>
+    </div>
+
+    <div class="emulator-section">
+        <div class="emulator-wrapper">
+            <div class="emulator-header">
+                <h2>
+                    Mike Tyson's Punch-Out!!
+                    <span class="game-badge">NES</span>
+                </h2>
+            </div>
+
+            <!-- EmulatorJS renders into this div (Nestopia core — full MMC2 support) -->
+            <div id="game"></div>
+
+            <div class="controls-guide">
+                <h3>&#127918; Controls</h3>
+                <div class="controls-grid">
+                    <div class="control-item"><kbd>&#8593;&#8595;&#8592;&#8594;</kbd><span>D-Pad / Move</span></div>
+                    <div class="control-item"><kbd>Z</kbd><span>B Button</span></div>
+                    <div class="control-item"><kbd>X</kbd><span>A Button</span></div>
+                    <div class="control-item"><kbd>Enter</kbd><span>Start</span></div>
+                    <div class="control-item"><kbd>Shift</kbd><span>Select</span></div>
+                    <div class="control-item"><kbd>F1&nbsp;–&nbsp;F8</kbd><span>Save / Load State</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 BudStrong. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        // EmulatorJS — Nestopia core supports all NES mappers including MMC2 (Punch-Out!!)
+        // Touch controls for mobile are provided automatically by EmulatorJS
+        EJS_player        = '#game';
+        EJS_core          = 'nes';
+        EJS_gameUrl       = "assets/games/Mike Tyson's Punch-Out!! (USA) (Rev-A).nes";
+        EJS_pathtodata    = 'https://cdn.emulatorjs.org/stable/data/';
+        EJS_color         = '#c41e3a';
+        EJS_startOnLoaded = false;
+    </script>
+    <script src="https://cdn.emulatorjs.org/stable/data/loader.js"></script>
+</body>
+</html>
