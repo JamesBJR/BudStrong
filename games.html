@@ -94,6 +94,52 @@
             color: #fff;
         }
 
+        /* Console selector */
+        .console-selector {
+            display: none;
+            margin-bottom: 16px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 16px;
+        }
+        .console-selector.open {
+            display: block;
+        }
+        .console-selector-title {
+            color: #fff;
+            font-size: 1rem;
+            margin-bottom: 12px;
+            text-align: center;
+        }
+        .console-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        .console-btn {
+            background: #222;
+            border: 1px solid #3a3a3a;
+            color: #ccc;
+            padding: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            text-align: center;
+            transition: all 0.15s;
+        }
+        .console-btn:hover {
+            background: #333;
+            border-color: #666;
+            color: #fff;
+            transform: translateY(-2px);
+        }
+        .console-btn.current {
+            background: var(--primary-red);
+            border-color: var(--primary-red);
+            color: #fff;
+        }
+
         /* Game picker panel */
         .game-picker {
             display: none;
@@ -231,6 +277,14 @@
             .controls-guide { display: none; }
             .emulator-header h2 { font-size: 1rem; }
             .pick-game-btn { font-size: 0.8rem; padding: 6px 10px; }
+            .console-buttons {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+            .console-btn {
+                padding: 10px;
+                font-size: 0.85rem;
+            }
         }
     </style>
 </head>
@@ -267,9 +321,20 @@
             <div class="emulator-header">
                 <h2>
                     <span class="game-title-text" id="current-game-title">Mike Tyson's Punch-Out!!</span>
-                    <span class="game-badge">NES</span>
+                    <span class="game-badge" id="console-badge">NES</span>
                 </h2>
                 <button class="pick-game-btn" id="pick-game-btn" onclick="togglePicker()">&#127918; Pick a Game</button>
+            </div>
+
+            <!-- Console selector panel -->
+            <div class="console-selector" id="console-selector">
+                <div class="console-selector-title">Choose a Console</div>
+                <div class="console-buttons">
+                    <button class="console-btn" onclick="selectConsole('nes')">🎮 NES</button>
+                    <button class="console-btn" onclick="selectConsole('gbc')">🎮 GBC</button>
+                    <button class="console-btn" onclick="selectConsole('snes')">🎮 SNES</button>
+                    <button class="console-btn" onclick="selectConsole('n64')">🎮 N64</button>
+                </div>
             </div>
 
             <!-- Game picker panel -->
@@ -289,8 +354,8 @@
             <div id="game"></div>
 
             <div class="controls-guide">
-                <h3>&#127918; Controls</h3>
-                <div class="controls-grid">
+                <h3 id="controls-title">&#127918; NES Controls</h3>
+                <div class="controls-grid" id="controls-grid">
                     <div class="control-item"><kbd>&#8593;&#8595;&#8592;&#8594;</kbd><span>D-Pad / Move</span></div>
                     <div class="control-item"><kbd>Z</kbd><span>B Button</span></div>
                     <div class="control-item"><kbd>X</kbd><span>A Button</span></div>
@@ -308,203 +373,500 @@
         </div>
     </footer>
 
-    <script>
-        // ── Game Library ─────────────────────────────────────────────────────────
-        // Each entry: { name, path }   (path relative to site root)
-        // Index 0 is always the default game (Mike Tyson's Punch-Out!!)
-        const BASE = "assets/games/All Games/";
+    <script>        // ── Control Mappings for Each Console ────────────────────────────
+        const CONTROLS = {
+            nes: [
+                { key: '↑↓←→', action: 'D-Pad / Move' },
+                { key: 'Z', action: 'B Button' },
+                { key: 'X', action: 'A Button' },
+                { key: 'Enter', action: 'Start' },
+                { key: 'Shift', action: 'Select' },
+                { key: 'F1&nbsp;–&nbsp;F8', action: 'Save / Load State' }
+            ],
+            gbc: [
+                { key: '↑↓←→', action: 'D-Pad / Move' },
+                { key: 'Z', action: 'B Button' },
+                { key: 'X', action: 'A Button' },
+                { key: 'Enter', action: 'Start' },
+                { key: 'Shift', action: 'Select' },
+                { key: 'F1&nbsp;–&nbsp;F8', action: 'Save / Load State' }
+            ],
+            snes: [
+                { key: '↑↓←→', action: 'D-Pad / Move' },
+                { key: 'Z', action: 'B Button' },
+                { key: 'X', action: 'A Button' },
+                { key: 'A', action: 'Y Button' },
+                { key: 'S', action: 'X Button' },
+                { key: 'D', action: 'L Shoulder' },
+                { key: 'C', action: 'R Shoulder' },
+                { key: 'Enter', action: 'Start' },
+                { key: 'Shift', action: 'Select' },
+                { key: 'F1&nbsp;–&nbsp;F8', action: 'Save / Load State' }
+            ],
+            n64: [
+                { key: '↑↓←→', action: 'D-Pad' },
+                { key: 'W A S D', action: 'C Buttons' },
+                { key: 'I K J L', action: 'Analog Stick' },
+                { key: 'Z', action: 'B Button' },
+                { key: 'X', action: 'A Button' },
+                { key: 'C', action: 'Z Trigger' },
+                { key: 'D', action: 'L Shoulder' },
+                { key: 'F', action: 'R Shoulder' },
+                { key: 'Enter', action: 'Start' },
+                { key: 'F1&nbsp;–&nbsp;F8', action: 'Save / Load State' }
+            ]
+        };
+        // ── Game Library for Multiple Consoles ─────────────────────────────────
+        const CONSOLES = {
+            nes: {
+                name: 'NES',
+                core: 'nes',
+                defaultGame: "assets/games/NES Games/Mike Tyson's Punch-Out!! (Japan, USA) (En) (Rev 1).nes",
+                categories: [
+                    {
+                        title: "Featured",
+                        games: [
+                            { name: "Mike Tyson's Punch-Out!!", path: "assets/games/NES Games/Mike Tyson's Punch-Out!! (Japan, USA) (En) (Rev 1).nes" },
+                        ]
+                    },
+                    {
+                        title: "Mario",
+                        games: [
+                            { name: "Super Mario Bros.", path: "assets/games/NES Games/Mario/Super Mario Bros. (World).nes" },
+                            { name: "Super Mario Bros. 2", path: "assets/games/NES Games/Mario/Super Mario Bros. 2 (USA) (Rev 1).nes" },
+                            { name: "Super Mario Bros. 3", path: "assets/games/NES Games/Mario/Super Mario Bros. 3 (USA) (Rev 1).nes" },
+                            { name: "Super Mario Bros. – Two Players Hack", path: "assets/games/NES Games/Mario/Super Mario Bros. - Two Players Hack (1.0).nes" },
+                            { name: "SMB1 – Celeste Zap & Dash (Hack)", path: "assets/games/NES Games/Mario/SMB1 - Celeste Mario's Zap & Dash DELUXE! (v2.00c) (w7N).nes" },
+                        ]
+                    },
+                    {
+                        title: "Mega Man",
+                        games: [
+                            { name: "Mega Man 2", path: "assets/games/NES Games/Mega Man/Mega Man 2 (USA).nes" },
+                            { name: "Mega Man 5", path: "assets/games/NES Games/Mega Man/Mega Man 5 (USA).nes" },
+                            { name: "Mega Man 6", path: "assets/games/NES Games/Mega Man/Mega Man 6 (USA).nes" },
+                        ]
+                    },
+                    {
+                        title: "Zelda",
+                        games: [
+                            { name: "The Legend of Zelda", path: "assets/games/NES Games/Zelda/Legend of Zelda, The (USA).nes" },
+                            { name: "Zelda II: The Adventure of Link", path: "assets/games/NES Games/Zelda/Zelda II - The Adventure of Link (USA).nes" },
+                        ]
+                    },
+                    {
+                        title: "Contra",
+                        games: [
+                            { name: "Contra", path: "assets/games/NES Games/Contra/Contra (Japan).nes" },
+                            { name: "Super Contra", path: "assets/games/NES Games/Contra/Super Contra (Japan).nes" },
+                        ]
+                    },
+                    {
+                        title: "Disney",
+                        games: [
+                            { name: "Chip 'n Dale: Rescue Rangers", path: "assets/games/NES Games/Disney/Chip 'n Dale - Rescue Rangers (USA).nes" },
+                            { name: "Chip 'n Dale: Rescue Rangers 2", path: "assets/games/NES Games/Disney/Chip 'n Dale - Rescue Rangers 2 (USA).nes" },
+                            { name: "DuckTales", path: "assets/games/NES Games/Disney/DuckTales (USA).nes" },
+                            { name: "DuckTales 2", path: "assets/games/NES Games/Disney/DuckTales 2 (USA).nes" },
+                        ]
+                    },
+                    {
+                        title: "Ninja Gaiden",
+                        games: [
+                            { name: "Ninja Gaiden III: The Ancient Ship of Doom", path: "assets/games/NES Games/Ninja Gaiden/Ninja Gaiden III - The Ancient Ship of Doom (USA).nes" },
+                            { name: "Deadpool (Ninja Gaiden Hack)", path: "assets/games/NES Games/Ninja Gaiden/Deadpool (Ninja Gaiden Hack) (Techmoon) (140.0).nes" },
+                        ]
+                    },
+                    {
+                        title: "Kunio-kun / River City",
+                        games: [
+                            { name: "River City Ransom", path: "assets/games/NES Games/Kunio-kun (mostly sports)/River City Ransom (USA).nes" },
+                            { name: "Super Dodge Ball", path: "assets/games/NES Games/Kunio-kun (mostly sports)/Super Dodge Ball (USA).nes" },
+                            { name: "Crash 'n' the Boys: Street Challenge", path: "assets/games/NES Games/Kunio-kun (mostly sports)/Crash 'n' the Boys - Street Challenge (USA).nes" },
+                            { name: "Nekketsu Kakutou Densetsu", path: "assets/games/NES Games/Kunio-kun (mostly sports)/Nekketsu Kakutou Densetsu (Japan).nes" },
+                            { name: "Nekketsu Street Basket", path: "assets/games/NES Games/Kunio-kun (mostly sports)/Nekketsu! Street Basket - Ganbare Dunk Heroes (Japan).nes" },
+                            { name: "Nekketsu Hockey-bu", path: "assets/games/NES Games/Kunio-kun (mostly sports)/Ike Ike! Nekketsu Hockey-bu - Subette Koronde Dairantou (Japan).nes" },
+                            { name: "Kunio-kun no Nekketsu Soccer League", path: "assets/games/NES Games/Kunio-kun (mostly sports)/Kunio-kun no Nekketsu Soccer League (Japan).nes" },
+                            { name: "Downtown Special: Kunio-kun no Jidaigeki", path: "assets/games/NES Games/Kunio-kun (mostly sports)/Downtown Special - Kunio-kun no Jidaigeki Da yo Zenin Shuugou! (Japan).nes" },
+                        ]
+                    },
+                    {
+                        title: "Sports",
+                        games: [
+                            { name: "Tecmo Super Bowl", path: "assets/games/NES Games/Sports/Tecmo Super Bowl (USA).nes" },
+                            { name: "Blades of Steel", path: "assets/games/NES Games/Sports/Blades of Steel (USA).nes" },
+                            { name: "Double Dribble", path: "assets/games/NES Games/Sports/Double Dribble (USA) (Rev 1).nes" },
+                            { name: "Ice Hockey", path: "assets/games/NES Games/Sports/Ice Hockey (USA).nes" },
+                            { name: "Super Spike V'Ball", path: "assets/games/NES Games/Sports/Super Spike V'Ball (USA).nes" },
+                            { name: "Track & Field", path: "assets/games/NES Games/Sports/Track & Field (USA).nes" },
+                            { name: "Golf", path: "assets/games/NES Games/Sports/Golf (Japan) (En).nes" },
+                            { name: "Tennis", path: "assets/games/NES Games/Sports/Tennis (Japan, USA) (En).nes" },
+                            { name: "Softball Tengoku", path: "assets/games/NES Games/Sports/Softball Tengoku (Japan).nes" },
+                            { name: "Captain Tsubasa II: Super Striker", path: "assets/games/NES Games/Sports/Captain Tsubasa II - Super Striker (Japan).nes" },
+                        ]
+                    },
+                    {
+                        title: "2-Player Games",
+                        games: [
+                            { name: "Shadow of the Ninja", path: "assets/games/NES Games/Play these games two player!/Shadow of the Ninja (USA).nes" },
+                            { name: "Ninja Crusaders", path: "assets/games/NES Games/Play these games two player!/Ninja Crusaders (USA).nes" },
+                        ]
+                    },
+                    {
+                        title: "Action / Adventure",
+                        games: [
+                            { name: "Castlevania", path: "assets/games/NES Games/Castlevania (USA) (Rev 1).nes" },
+                            { name: "Metroid", path: "assets/games/NES Games/Metroid (USA).nes" },
+                            { name: "Bionic Commando", path: "assets/games/NES Games/Bionic Commando (USA).nes" },
+                            { name: "Little Samson", path: "assets/games/NES Games/Little Samson (USA).nes" },
+                            { name: "Metal Storm", path: "assets/games/NES Games/Metal Storm (USA).nes" },
+                            { name: "KickMaster", path: "assets/games/NES Games/KickMaster (USA).nes" },
+                            { name: "Shatterhand", path: "assets/games/NES Games/Shatterhand (USA).nes" },
+                            { name: "Power Blade", path: "assets/games/NES Games/Power Blade (USA).nes" },
+                            { name: "Gargoyle's Quest II", path: "assets/games/NES Games/Gargoyle's Quest II (USA).nes" },
+                            { name: "Vice: Project Doom", path: "assets/games/NES Games/Vice - Project Doom (USA).nes" },
+                            { name: "Mighty Final Fight", path: "assets/games/NES Games/Mighty Final Fight (USA).nes" },
+                            { name: "Double Dragon II: The Revenge", path: "assets/games/NES Games/Double Dragon II - The Revenge (USA) (Rev 1).nes" },
+                            { name: "TMNT III: The Manhattan Project", path: "assets/games/NES Games/Teenage Mutant Ninja Turtles III - The Manhattan Project (USA).nes" },
+                            { name: "G.I. Joe: A Real American Hero", path: "assets/games/NES Games/G.I. Joe - A Real American Hero (USA).nes" },
+                            { name: "Jackal", path: "assets/games/NES Games/Jackal (USA).nes" },
+                            { name: "Guerrilla War", path: "assets/games/NES Games/Guerrilla War (USA).nes" },
+                            { name: "Rampage", path: "assets/games/NES Games/Rampage (USA).nes" },
+                            { name: "Adventure Island 3", path: "assets/games/NES Games/Adventure Island 3 (USA).nes" },
+                            { name: "The Legend of Kage", path: "assets/games/NES Games/Legend of Kage, The (USA).nes" },
+                            { name: "Rockin' Kats", path: "assets/games/NES Games/Rockin' Kats (USA).nes" },
+                        ]
+                    },
+                    {
+                        title: "Arcade Classics",
+                        games: [
+                            { name: "Donkey Kong", path: "assets/games/NES Games/Donkey Kong (World) (Rev 1).nes" },
+                            { name: "Excitebike", path: "assets/games/NES Games/Excitebike (Japan, USA) (En).nes" },
+                            { name: "Ice Climber", path: "assets/games/NES Games/Ice Climber (Japan) (En).nes" },
+                            { name: "Balloon Fight", path: "assets/games/NES Games/Balloon Fight (Japan) (En).nes" },
+                            { name: "Popeye", path: "assets/games/NES Games/Popeye (World) (Rev 1).nes" },
+                            { name: "Mappy", path: "assets/games/NES Games/Mappy (Japan) (En).nes" },
+                            { name: "Circus Charlie", path: "assets/games/NES Games/Circus Charlie (Japan) (En).nes" },
+                            { name: "BattleCity", path: "assets/games/NES Games/BattleCity (Japan) (En).nes" },
+                            { name: "Paperboy", path: "assets/games/NES Games/Paperboy (USA).nes" },
+                            { name: "Pinball", path: "assets/games/NES Games/Pinball (Japan, USA) (En).nes" },
+                            { name: "Gun.Smoke", path: "assets/games/NES Games/Gun.Smoke (USA).nes" },
+                            { name: "Road Fighter", path: "assets/games/NES Games/Road Fighter (Japan) (En).nes" },
+                            { name: "Pro Wrestling", path: "assets/games/NES Games/Pro Wrestling (USA).nes" },
+                            { name: "Spelunker", path: "assets/games/NES Games/Spelunker (USA).nes" },
+                            { name: "Kung Fu", path: "assets/games/NES Games/Kung Fu (Japan, USA) (En).nes" },
+                            { name: "Yie Ar Kung-Fu", path: "assets/games/NES Games/Yie Ar Kung-Fu (Japan) (En) (Rev 1.4).nes" },
+                            { name: "Tetris (Tengen)", path: "assets/games/NES Games/Tetris (USA) (Tengen) (Unl).nes" },
+                        ]
+                    },
+                    {
+                        title: "Hidden Gems",
+                        games: [
+                            { name: "Kirby's Adventure", path: "assets/games/NES Games/Kirby's Adventure (USA) (Rev 1).nes" },
+                            { name: "Gimmick!", path: "assets/games/NES Games/Gimmick! (Japan) (En).nes" },
+                            { name: "Gun Nac", path: "assets/games/NES Games/Gun Nac (USA).nes" },
+                            { name: "Fire 'n Ice", path: "assets/games/NES Games/Fire 'n Ice (USA).nes" },
+                            { name: "Bubble Bobble", path: "assets/games/NES Games/Bubble Bobble (USA).nes" },
+                            { name: "Panic Restaurant", path: "assets/games/NES Games/Panic Restaurant (USA).nes" },
+                            { name: "Felix the Cat", path: "assets/games/NES Games/Felix the Cat (USA) (Hudson).nes" },
+                            { name: "Hammerin' Harry", path: "assets/games/NES Games/Hammerin' Harry (Europe).nes" },
+                            { name: "Cowboy Kid", path: "assets/games/NES Games/Cowboy Kid (USA).nes" },
+                            { name: "Maniac Mansion", path: "assets/games/NES Games/Maniac Mansion (USA).nes" },
+                            { name: "Princess Tomato in the Salad Kingdom", path: "assets/games/NES Games/Princess Tomato in the Salad Kingdom (USA).nes" },
+                            { name: "Rescue: The Embassy Mission", path: "assets/games/NES Games/Rescue - The Embassy Mission (USA).nes" },
+                            { name: "Hebereke", path: "assets/games/NES Games/Hebereke (Japan).nes" },
+                            { name: "Bio Miracle Bokutte Upa", path: "assets/games/NES Games/Bio Miracle Bokutte Upa (Japan).nes" },
+                            { name: "Cat Ninden Teyandee", path: "assets/games/NES Games/Cat Ninden Teyandee (Japan).nes" },
+                            { name: "Chou-Wakusei Senki (MetaFight)", path: "assets/games/NES Games/Chou-Wakusei Senki - MetaFight (Japan) (En).nes" },
+                            { name: "Mitsume ga Tooru", path: "assets/games/NES Games/Mitsume ga Tooru (Japan).nes" },
+                            { name: "Splatterhouse: Wanpaku Graffiti", path: "assets/games/NES Games/Splatterhouse - Wanpaku Graffiti (Japan).nes" },
+                            { name: "The Flintstones: Surprise at Dinosaur Peak", path: "assets/games/NES Games/Flintstones, The - The Surprise at Dinosaur Peak! (USA).nes" },
+                            { name: "Ivan 'Ironman' Stewart's Super Off Road", path: "assets/games/NES Games/Ivan 'Ironman' Stewart's Super Off Road (USA).nes" },
+                            { name: "Kekkyoku Nankyoku Daibouken", path: "assets/games/NES Games/Kekkyoku Nankyoku Daibouken (Japan) (Rev 1).nes" },
+                        ]
+                    },
+                    {
+                        title: "Zapper Games (light gun)",
+                        games: [
+                            { name: "Duck Hunt", path: "assets/games/NES Games/Zapper/Duck Hunt (World).nes" },
+                            { name: "Hogan's Alley", path: "assets/games/NES Games/Zapper/Hogan's Alley (World).nes" },
+                            { name: "Wild Gunman", path: "assets/games/NES Games/Zapper/Wild Gunman (World) (Rev 1).nes" },
+                        ]
+                    },
+                ]
+            },
+            gbc: {
+                name: 'GBC',
+                core: 'gb',
+                defaultGame: "assets/games/GBC Games/Pokémon Series/Pokemon - Gold Version (USA, Europe).gbc",
+                categories: [
+                    {
+                        title: "Pokémon",
+                        games: [
+                            { name: "Pokémon Gold", path: "assets/games/GBC Games/Pokémon Series/Pokemon - Gold Version (USA, Europe).gbc" },
+                            { name: "Pokémon Silver", path: "assets/games/GBC Games/Pokémon Series/Pokemon - Silver Version (USA, Europe).gbc" },
+                            { name: "Pokémon Crystal", path: "assets/games/GBC Games/Pokémon Series/Pokemon - Crystal Version (USA, Europe).gbc" },
+                            { name: "Pokémon Yellow", path: "assets/games/GBC Games/Pokémon Series/Pokemon - Yellow Version (USA, Europe).gbc" },
+                        ]
+                    },
+                    {
+                        title: "Zelda",
+                        games: [
+                            { name: "The Legend of Zelda: Link's Awakening DX", path: "assets/games/GBC Games/The Legend of Zelda/Zelda DX - Links Awakening (USA)(Independent).gbc" }, 
+                            { name: "The Legend of Zelda: Oracle of Ages", path: "assets/games/GBC Games/The Legend of Zelda/Legend of Zelda, The - Oracle of Ages (U) [C][h2].gbc" },
+                            { name: "The Legend of Zelda: Oracle of Seasons", path: "assets/games/GBC Games/The Legend of Zelda/legend of zelda, the - oracle of seasons (u) [c][h2].gbc" },
+                        ]
+                    },
+                    {
+                        title: "Dragon Warrior",
+                        games: [
+                            { name: "Dragon Warrior III", path: "assets/games/GBC Games/Dragon Warrior Monster Series/dragon warrior iii (u) [c][!].gbc" },
+                            { name: "Dragon Warrior Monsters", path: "assets/games/GBC Games/Dragon Warrior Monster Series/dragon warrior monsters (u) [c][h1].gbc" },
+                            { name: "Dragon Warrior Monsters 2: Cobi's Journey", path: "assets/games/GBC Games/Dragon Warrior Monster Series/dragon warrior monsters 2 - cobi's journey (u) [c][!].gbc" },
+                            { name: "Dragon Warrior Monsters 2: Tara's Adventure", path: "assets/games/GBC Games/Dragon Warrior Monster Series/dragon warrior monsters 2 - tara's adventure (u) [c][!].gbc" },
+                        ]
+                    },
+                    {
+                        title: "Classic Retro",
+                        games: [
+                            { name: "Bust-A-Move 4", path: "assets/games/GBC Games/Classic Retro Ports/bust-a-move 4 (ue) [c][t1].gbc" },
+                            { name: "Bust-A-Move Millennium", path: "assets/games/GBC Games/Classic Retro Ports/Bust-a-Move Millennium (U) [C][!].gbc" },
+                            { name: "Centipede", path: "assets/games/GBC Games/Classic Retro Ports/Centipede (U) [C][b1].gbc" },
+                            { name: "Joust & Defender", path: "assets/games/GBC Games/Classic Retro Ports/Joust & Defender (U) [C][t1].gbc" },
+                        ]
+                    },
+                    {
+                        title: "Donkey Kong",
+                        games: [
+                            { name: "Donkey Kong 5", path: "assets/games/GBC Games/Donkey Kong/Donkey Kong 5 [C][b1].gbc" },
+                            { name: "Donkey Kong Country", path: "assets/games/GBC Games/Donkey Kong/Donkey Kong Country (UE) (M5) [C][t1].gbc" },
+                        ]
+                    },
+                    {
+                        title: "Kirby",
+                        games: [
+                            { name: "Kirby's Tilt 'n' Tumble", path: "assets/games/GBC Games/Kirby/Kirby's Tilt 'n Tumble (U) [C][f1].gbc" },
+                        ]
+                    },
+                    {
+                        title: "Keepers (Must-Play)",
+                        games: [
+                            { name: "Mega Man Xtreme 2", path: "assets/games/GBC Games/Keepers/Mega Man Xtreme 2.gbc" },
+                            { name: "Tony Hawk's Pro Skater", path: "assets/games/GBC Games/Keepers/Tony Hawk's Pro Skater (U) [C][!].gbc" },
+                            { name: "Tony Hawk's Pro Skater 2", path: "assets/games/GBC Games/Keepers/Tony Hawk's Pro Skater 2 (U) [C][!].gbc" },
+                            { name: "Bomberman Quest", path: "assets/games/GBC Games/Keepers/Bomberman Quest (U) [C][BF].gbc" },
+                        ]
+                    },
+                    {
+                        title: "Blaster Action",
+                        games: [
+                            { name: "Asteroids", path: "assets/games/GBC Games/Blaster Action Games/Asteroids (U) [C][!].gbc" },
+                            { name: "Blade", path: "assets/games/GBC Games/Blaster Action Games/Blade (U) [C][!].gbc" },
+                            { name: "Blaster Master Enemy Below", path: "assets/games/GBC Games/Blaster Action Games/Blaster Master Enemy Below (U) [C][!].gbc" },
+                            { name: "Crystalis", path: "assets/games/GBC Games/Blaster Action Games/Crystalis (U) [C][!].gbc" },
+                        ]
+                    },
+                ]
+            },
+            snes: {
+                name: 'SNES',
+                core: 'snes',
+                defaultGame: "assets/games/SNES Games/Platformers - Adventure/Super Mario All-Stars + Super Mario World (USA).sfc",
+                categories: [
+                    {
+                        title: "Platformers - Adventure",
+                        games: [
+                            { name: "Super Mario All-Stars + Super Mario World", path: "assets/games/SNES Games/Platformers - Adventure/Super Mario All-Stars + Super Mario World (USA).sfc" },
+                            { name: "Super Mario World 2: Yoshi's Island", path: "assets/games/SNES Games/Platformers - Adventure/Super Mario World 2 - Yoshi's Island (USA) (Rev 1).sfc" },
+                            { name: "Super Mario Kart", path: "assets/games/SNES Games/Platformers - Adventure/Super Mario Kart (USA).sfc" },
+                            { name: "Donkey Kong Country", path: "assets/games/SNES Games/Platformers - Adventure/Donkey Kong Country (USA) (Rev 2).sfc" },
+                            { name: "Donkey Kong Country 2", path: "assets/games/SNES Games/Platformers - Adventure/Donkey Kong Country 2 - Diddy's Kong Quest (USA) (En,Fr) (Rev 1).sfc" },
+                            { name: "Donkey Kong Country 3", path: "assets/games/SNES Games/Platformers - Adventure/Donkey Kong Country 3 - Dixie Kong's Double Trouble! (USA) (En,Fr).sfc" },
+                            { name: "Mega Man X", path: "assets/games/SNES Games/Platformers - Adventure/Mega Man X (USA) (Rev 1).sfc" },
+                            { name: "Mega Man X2", path: "assets/games/SNES Games/Platformers - Adventure/Mega Man X2 (USA).sfc" },
+                            { name: "Mega Man X3", path: "assets/games/SNES Games/Platformers - Adventure/Mega Man X3 (USA).sfc" },
+                            { name: "Earthworm Jim", path: "assets/games/SNES Games/Platformers - Adventure/Earthworm Jim (USA).sfc" },
+                        ]
+                    },
+                    {
+                        title: "RPG - Strategy",
+                        games: [
+                            { name: "Chrono Trigger", path: "assets/games/SNES Games/RPG - Strategy/Chrono Trigger (USA).sfc" },
+                            { name: "Final Fantasy II (IV)", path: "assets/games/SNES Games/RPG - Strategy/Final Fantasy II (USA) (Rev 1).sfc" },
+                            { name: "Final Fantasy III (VI)", path: "assets/games/SNES Games/RPG - Strategy/Final Fantasy III (USA) (Rev 1).sfc" },
+                            { name: "Super Mario RPG", path: "assets/games/SNES Games/RPG - Strategy/Super Mario RPG - Legend of the Seven Stars (USA).sfc" },
+                            { name: "Secret of Mana", path: "assets/games/SNES Games/RPG - Strategy/Secret of Mana (USA).sfc" },
+                            { name: "Breath of Fire", path: "assets/games/SNES Games/RPG - Strategy/Breath of Fire (USA).sfc" },
+                            { name: "Breath of Fire II", path: "assets/games/SNES Games/RPG - Strategy/Breath of Fire II (USA).sfc" },
+                            { name: "Lufia & the Fortress of Doom", path: "assets/games/SNES Games/RPG - Strategy/Lufia & the Fortress of Doom (USA).sfc" },
+                            { name: "Lufia II: Rise of the Sinistrals", path: "assets/games/SNES Games/RPG - Strategy/Lufia II - Rise of the Sinistrals (USA).sfc" },
+                            { name: "Illusion of Gaia", path: "assets/games/SNES Games/RPG - Strategy/Illusion of Gaia (USA).sfc" },
+                            { name: "Ogre Battle", path: "assets/games/SNES Games/RPG - Strategy/Ogre Battle - The March of the Black Queen (USA).sfc" },
+                        ]
+                    },
+                    {
+                        title: "Fighting - Action",
+                        games: [
+                            { name: "Street Fighter II Turbo", path: "assets/games/SNES Games/Fighting - Action/Street Fighter II Turbo (USA) (Rev 1).sfc" },
+                            { name: "Mortal Kombat II", path: "assets/games/SNES Games/Fighting - Action/Mortal Kombat II (USA) (Rev 1).sfc" },
+                            { name: "Mortal Kombat 3", path: "assets/games/SNES Games/Fighting - Action/Mortal Kombat 3 (USA).sfc" },
+                            { name: "Killer Instinct", path: "assets/games/SNES Games/Fighting - Action/Killer Instinct (USA) (Rev 1).sfc" },
+                            { name: "Final Fight", path: "assets/games/SNES Games/Fighting - Action/Final Fight (USA).sfc" },
+                            { name: "Final Fight 2", path: "assets/games/SNES Games/Fighting - Action/Final Fight 2 (USA).sfc" },
+                            { name: "Final Fight 3", path: "assets/games/SNES Games/Fighting - Action/Final Fight 3 (USA).sfc" },
+                            { name: "TMNT IV: Turtles in Time", path: "assets/games/SNES Games/Fighting - Action/Teenage Mutant Ninja Turtles IV - Turtles in Time (USA).sfc" },
+                        ]
+                    },
+                    {
+                        title: "Cult - Misc Classics",
+                        games: [
+                            { name: "Kirby Super Star", path: "assets/games/SNES Games/Cult - Misc Classics/Kirby Super Star (USA).sfc" },
+                            { name: "Kirby's Dream Land 3", path: "assets/games/SNES Games/Cult - Misc Classics/Kirby's Dream Land 3 (USA).sfc" },
+                            { name: "Kirby's Dream Course", path: "assets/games/SNES Games/Cult - Misc Classics/Kirby's Dream Course (USA).sfc" },
+                            { name: "Kirby's Avalanche", path: "assets/games/SNES Games/Cult - Misc Classics/Kirby's Avalanche (USA).sfc" },
+                            { name: "Harvest Moon", path: "assets/games/SNES Games/Cult - Misc Classics/Harvest Moon (USA).sfc" },
+                            { name: "Secret of Evermore", path: "assets/games/SNES Games/Cult - Misc Classics/Secret of Evermore (USA).sfc" },
+                            { name: "Soul Blazer", path: "assets/games/SNES Games/Cult - Misc Classics/Soul Blazer (USA).sfc" },
+                            { name: "Terranigma", path: "assets/games/SNES Games/Cult - Misc Classics/Terranigma (Europe).sfc" },
+                        ]
+                    },
+                    {
+                        title: "Licensed - Movie-Based",
+                        games: [
+                            { name: "Aladdin", path: "assets/games/SNES Games/Licensed - Movie-Based/Aladdin (USA).sfc" },
+                            { name: "The Lion King", path: "assets/games/SNES Games/Licensed - Movie-Based/Lion King, The (USA).sfc" },
+                            { name: "Goof Troop", path: "assets/games/SNES Games/Licensed - Movie-Based/Goof Troop (USA).sfc" },
+                            { name: "Toy Story", path: "assets/games/SNES Games/Licensed - Movie-Based/Toy Story (USA).sfc" },
+                            { name: "Jurassic Park", path: "assets/games/SNES Games/Licensed - Movie-Based/Jurassic Park (USA) (Rev 1).sfc" },
+                            { name: "Batman Returns", path: "assets/games/SNES Games/Licensed - Movie-Based/Batman Returns (USA).sfc" },
+                            { name: "X-Men: Mutant Apocalypse", path: "assets/games/SNES Games/Licensed - Movie-Based/X-Men - Mutant Apocalypse (USA).sfc" },
+                        ]
+                    },
+                ]
+            },
+            n64: {
+                name: 'N64',
+                core: 'n64',
+                defaultGame: "assets/games/N64 Games/Super Mario 64 (USA).z64",
+                categories: [
+                    {
+                        title: "Mario Games",
+                        games: [
+                            { name: "Super Mario 64", path: "assets/games/N64 Games/Super Mario 64 (USA).z64" },
+                            { name: "Mario Kart 64", path: "assets/games/N64 Games/Mario Kart 64 (USA).z64" },
+                            { name: "Paper Mario", path: "assets/games/N64 Games/Paper Mario (USA).z64" },
+                        ]
+                    },
+                    {
+                        title: "Zelda",
+                        games: [
+                            { name: "The Legend of Zelda: Ocarina of Time", path: "assets/games/N64 Games/Legend of Zelda, The - Ocarina of Time (USA) (Rev 2).z64" },
+                            { name: "The Legend of Zelda: Majora's Mask", path: "assets/games/N64 Games/Legend of Zelda, The - Majora's Mask (USA).z64" },
+                        ]
+                    },
+                    {
+                        title: "Rare Classics",
+                        games: [
+                            { name: "Banjo-Kazooie", path: "assets/games/N64 Games/Banjo-Kazooie (USA) (Rev 1).z64" },
+                            { name: "Banjo-Tooie", path: "assets/games/N64 Games/Banjo-Tooie (USA).z64" },
+                            { name: "Donkey Kong 64", path: "assets/games/N64 Games/Donkey Kong 64 (USA).z64" },
+                            { name: "GoldenEye 007", path: "assets/games/N64 Games/GoldenEye 007 (USA).z64" },
+                            { name: "Perfect Dark", path: "assets/games/N64 Games/Perfect Dark (USA) (Rev 1).z64" },
+                        ]
+                    },
+                    {
+                        title: "Action",
+                        games: [
+                            { name: "Super Smash Bros.", path: "assets/games/N64 Games/Super Smash Bros. (USA).z64" },
+                            { name: "Star Fox 64", path: "assets/games/N64 Games/Star Fox 64 (USA) (Rev 1).z64" },
+                            { name: "Mega Man 64", path: "assets/games/N64 Games/Mega Man 64 (USA).z64" },
+                            { name: "Bomberman Hero", path: "assets/games/N64 Games/Bomberman Hero (USA).z64" },
+                        ]
+                    },
+                ]
+            },
+        };
 
-        const GAME_CATEGORIES = [
-            {
-                title: "Featured",
-                games: [
-                    { name: "Mike Tyson's Punch-Out!!", path: BASE + "Mike Tyson's Punch-Out!! (Japan, USA) (En) (Rev 1).nes" },
-                ]
-            },
-            {
-                title: "Mario",
-                games: [
-                    { name: "Super Mario Bros.", path: BASE + "Mario/Super Mario Bros. (World).nes" },
-                    { name: "Super Mario Bros. 2", path: BASE + "Mario/Super Mario Bros. 2 (USA) (Rev 1).nes" },
-                    { name: "Super Mario Bros. 3", path: BASE + "Mario/Super Mario Bros. 3 (USA) (Rev 1).nes" },
-                    { name: "Super Mario Bros. – Two Players Hack", path: BASE + "Mario/Super Mario Bros. - Two Players Hack (1.0).nes" },
-                    { name: "SMB1 – Celeste Zap & Dash (Hack)", path: BASE + "Mario/SMB1 - Celeste Mario's Zap & Dash DELUXE! (v2.00c) (w7N).nes" },
-                ]
-            },
-            {
-                title: "Mega Man",
-                games: [
-                    { name: "Mega Man 2", path: BASE + "Mega Man/Mega Man 2 (USA).nes" },
-                    { name: "Mega Man 5", path: BASE + "Mega Man/Mega Man 5 (USA).nes" },
-                    { name: "Mega Man 6", path: BASE + "Mega Man/Mega Man 6 (USA).nes" },
-                ]
-            },
-            {
-                title: "Zelda",
-                games: [
-                    { name: "The Legend of Zelda", path: BASE + "Zelda/Legend of Zelda, The (USA).nes" },
-                    { name: "Zelda II: The Adventure of Link", path: BASE + "Zelda/Zelda II - The Adventure of Link (USA).nes" },
-                ]
-            },
-            {
-                title: "Contra",
-                games: [
-                    { name: "Contra", path: BASE + "Contra/Contra (Japan).nes" },
-                    { name: "Super Contra", path: BASE + "Contra/Super Contra (Japan).nes" },
-                ]
-            },
-            {
-                title: "Disney",
-                games: [
-                    { name: "Chip 'n Dale: Rescue Rangers", path: BASE + "Disney/Chip 'n Dale - Rescue Rangers (USA).nes" },
-                    { name: "Chip 'n Dale: Rescue Rangers 2", path: BASE + "Disney/Chip 'n Dale - Rescue Rangers 2 (USA).nes" },
-                    { name: "DuckTales", path: BASE + "Disney/DuckTales (USA).nes" },
-                    { name: "DuckTales 2", path: BASE + "Disney/DuckTales 2 (USA).nes" },
-                ]
-            },
-            {
-                title: "Ninja Gaiden",
-                games: [
-                    { name: "Ninja Gaiden III: The Ancient Ship of Doom", path: BASE + "Ninja Gaiden/Ninja Gaiden III - The Ancient Ship of Doom (USA).nes" },
-                    { name: "Deadpool (Ninja Gaiden Hack)", path: BASE + "Ninja Gaiden/Deadpool (Ninja Gaiden Hack) (Techmoon) (140.0).nes" },
-                ]
-            },
-            {
-                title: "Kunio-kun / River City",
-                games: [
-                    { name: "River City Ransom", path: BASE + "Kunio-kun (mostly sports)/River City Ransom (USA).nes" },
-                    { name: "Super Dodge Ball", path: BASE + "Kunio-kun (mostly sports)/Super Dodge Ball (USA).nes" },
-                    { name: "Crash 'n' the Boys: Street Challenge", path: BASE + "Kunio-kun (mostly sports)/Crash 'n' the Boys - Street Challenge (USA).nes" },
-                    { name: "Nekketsu Kakutou Densetsu", path: BASE + "Kunio-kun (mostly sports)/Nekketsu Kakutou Densetsu (Japan).nes" },
-                    { name: "Nekketsu Street Basket", path: BASE + "Kunio-kun (mostly sports)/Nekketsu! Street Basket - Ganbare Dunk Heroes (Japan).nes" },
-                    { name: "Nekketsu Hockey-bu", path: BASE + "Kunio-kun (mostly sports)/Ike Ike! Nekketsu Hockey-bu - Subette Koronde Dairantou (Japan).nes" },
-                    { name: "Kunio-kun no Nekketsu Soccer League", path: BASE + "Kunio-kun (mostly sports)/Kunio-kun no Nekketsu Soccer League (Japan).nes" },
-                    { name: "Downtown Special: Kunio-kun no Jidaigeki", path: BASE + "Kunio-kun (mostly sports)/Downtown Special - Kunio-kun no Jidaigeki Da yo Zenin Shuugou! (Japan).nes" },
-                ]
-            },
-            {
-                title: "Sports",
-                games: [
-                    { name: "Tecmo Super Bowl", path: BASE + "Sports/Tecmo Super Bowl (USA).nes" },
-                    { name: "Blades of Steel", path: BASE + "Sports/Blades of Steel (USA).nes" },
-                    { name: "Double Dribble", path: BASE + "Sports/Double Dribble (USA) (Rev 1).nes" },
-                    { name: "Ice Hockey", path: BASE + "Sports/Ice Hockey (USA).nes" },
-                    { name: "Super Spike V'Ball", path: BASE + "Sports/Super Spike V'Ball (USA).nes" },
-                    { name: "Track & Field", path: BASE + "Sports/Track & Field (USA).nes" },
-                    { name: "Golf", path: BASE + "Sports/Golf (Japan) (En).nes" },
-                    { name: "Tennis", path: BASE + "Sports/Tennis (Japan, USA) (En).nes" },
-                    { name: "Softball Tengoku", path: BASE + "Sports/Softball Tengoku (Japan).nes" },
-                    { name: "Captain Tsubasa II: Super Striker", path: BASE + "Sports/Captain Tsubasa II - Super Striker (Japan).nes" },
-                ]
-            },
-            {
-                title: "2-Player Games",
-                games: [
-                    { name: "Shadow of the Ninja", path: BASE + "Play these games two player!/Shadow of the Ninja (USA).nes" },
-                    { name: "Ninja Crusaders", path: BASE + "Play these games two player!/Ninja Crusaders (USA).nes" },
-                ]
-            },
-            {
-                title: "Action / Adventure",
-                games: [
-                    { name: "Castlevania", path: BASE + "Castlevania (USA) (Rev 1).nes" },
-                    { name: "Metroid", path: BASE + "Metroid (USA).nes" },
-                    { name: "Bionic Commando", path: BASE + "Bionic Commando (USA).nes" },
-                    { name: "Little Samson", path: BASE + "Little Samson (USA).nes" },
-                    { name: "Metal Storm", path: BASE + "Metal Storm (USA).nes" },
-                    { name: "KickMaster", path: BASE + "KickMaster (USA).nes" },
-                    { name: "Shatterhand", path: BASE + "Shatterhand (USA).nes" },
-                    { name: "Power Blade", path: BASE + "Power Blade (USA).nes" },
-                    { name: "Gargoyle's Quest II", path: BASE + "Gargoyle's Quest II (USA).nes" },
-                    { name: "Vice: Project Doom", path: BASE + "Vice - Project Doom (USA).nes" },
-                    { name: "Mighty Final Fight", path: BASE + "Mighty Final Fight (USA).nes" },
-                    { name: "Double Dragon II: The Revenge", path: BASE + "Double Dragon II - The Revenge (USA) (Rev 1).nes" },
-                    { name: "TMNT III: The Manhattan Project", path: BASE + "Teenage Mutant Ninja Turtles III - The Manhattan Project (USA).nes" },
-                    { name: "G.I. Joe: A Real American Hero", path: BASE + "G.I. Joe - A Real American Hero (USA).nes" },
-                    { name: "Jackal", path: BASE + "Jackal (USA).nes" },
-                    { name: "Guerrilla War", path: BASE + "Guerrilla War (USA).nes" },
-                    { name: "Rampage", path: BASE + "Rampage (USA).nes" },
-                    { name: "Adventure Island 3", path: BASE + "Adventure Island 3 (USA).nes" },
-                    { name: "The Legend of Kage", path: BASE + "Legend of Kage, The (USA).nes" },
-                    { name: "Rockin' Kats", path: BASE + "Rockin' Kats (USA).nes" },
-                ]
-            },
-            {
-                title: "Arcade Classics",
-                games: [
-                    { name: "Donkey Kong", path: BASE + "Donkey Kong (World) (Rev 1).nes" },
-                    { name: "Excitebike", path: BASE + "Excitebike (Japan, USA) (En).nes" },
-                    { name: "Ice Climber", path: BASE + "Ice Climber (Japan) (En).nes" },
-                    { name: "Balloon Fight", path: BASE + "Balloon Fight (Japan) (En).nes" },
-                    { name: "Popeye", path: BASE + "Popeye (World) (Rev 1).nes" },
-                    { name: "Mappy", path: BASE + "Mappy (Japan) (En).nes" },
-                    { name: "Circus Charlie", path: BASE + "Circus Charlie (Japan) (En).nes" },
-                    { name: "BattleCity", path: BASE + "BattleCity (Japan) (En).nes" },
-                    { name: "Paperboy", path: BASE + "Paperboy (USA).nes" },
-                    { name: "Pinball", path: BASE + "Pinball (Japan, USA) (En).nes" },
-                    { name: "Gun.Smoke", path: BASE + "Gun.Smoke (USA).nes" },
-                    { name: "Road Fighter", path: BASE + "Road Fighter (Japan) (En).nes" },
-                    { name: "Pro Wrestling", path: BASE + "Pro Wrestling (USA).nes" },
-                    { name: "Spelunker", path: BASE + "Spelunker (USA).nes" },
-                    { name: "Kung Fu", path: BASE + "Kung Fu (Japan, USA) (En).nes" },
-                    { name: "Yie Ar Kung-Fu", path: BASE + "Yie Ar Kung-Fu (Japan) (En) (Rev 1.4).nes" },
-                    { name: "Tetris (Tengen)", path: BASE + "Tetris (USA) (Tengen) (Unl).nes" },
-                ]
-            },
-            {
-                title: "Hidden Gems",
-                games: [
-                    { name: "Kirby's Adventure", path: BASE + "Kirby's Adventure (USA) (Rev 1).nes" },
-                    { name: "Gimmick!", path: BASE + "Gimmick! (Japan) (En).nes" },
-                    { name: "Gun Nac", path: BASE + "Gun Nac (USA).nes" },
-                    { name: "Fire 'n Ice", path: BASE + "Fire 'n Ice (USA).nes" },
-                    { name: "Bubble Bobble", path: BASE + "Bubble Bobble (USA).nes" },
-                    { name: "Panic Restaurant", path: BASE + "Panic Restaurant (USA).nes" },
-                    { name: "Felix the Cat", path: BASE + "Felix the Cat (USA) (Hudson).nes" },
-                    { name: "Hammerin' Harry", path: BASE + "Hammerin' Harry (Europe).nes" },
-                    { name: "Cowboy Kid", path: BASE + "Cowboy Kid (USA).nes" },
-                    { name: "Maniac Mansion", path: BASE + "Maniac Mansion (USA).nes" },
-                    { name: "Princess Tomato in the Salad Kingdom", path: BASE + "Princess Tomato in the Salad Kingdom (USA).nes" },
-                    { name: "Rescue: The Embassy Mission", path: BASE + "Rescue - The Embassy Mission (USA).nes" },
-                    { name: "Hebereke", path: BASE + "Hebereke (Japan).nes" },
-                    { name: "Bio Miracle Bokutte Upa", path: BASE + "Bio Miracle Bokutte Upa (Japan).nes" },
-                    { name: "Cat Ninden Teyandee", path: BASE + "Cat Ninden Teyandee (Japan).nes" },
-                    { name: "Chou-Wakusei Senki (MetaFight)", path: BASE + "Chou-Wakusei Senki - MetaFight (Japan) (En).nes" },
-                    { name: "Mitsume ga Tooru", path: BASE + "Mitsume ga Tooru (Japan).nes" },
-                    { name: "Splatterhouse: Wanpaku Graffiti", path: BASE + "Splatterhouse - Wanpaku Graffiti (Japan).nes" },
-                    { name: "The Flintstones: Surprise at Dinosaur Peak", path: BASE + "Flintstones, The - The Surprise at Dinosaur Peak! (USA).nes" },
-                    { name: "Ivan 'Ironman' Stewart's Super Off Road", path: BASE + "Ivan 'Ironman' Stewart's Super Off Road (USA).nes" },
-                    { name: "Kekkyoku Nankyoku Daibouken", path: BASE + "Kekkyoku Nankyoku Daibouken (Japan) (Rev 1).nes" },
-                ]
-            },
-            {
-                title: "Zapper Games (light gun)",
-                games: [
-                    { name: "Duck Hunt", path: BASE + "Zapper/Duck Hunt (World).nes" },
-                    { name: "Hogan's Alley", path: BASE + "Zapper/Hogan's Alley (World).nes" },
-                    { name: "Wild Gunman", path: BASE + "Zapper/Wild Gunman (World) (Rev 1).nes" },
-                ]
-            },
-        ];
+        // Current console and game state
+        let currentConsole = 'nes';
+        let currentGame = null;
 
-        // Flatten to a lookup: path -> name
-        const PATH_TO_NAME = {};
-        GAME_CATEGORIES.forEach(cat => cat.games.forEach(g => { PATH_TO_NAME[g.path] = g.name; }));
+        // Build lookup tables for all consoles
+        function buildPathToNameLookup() {
+            const lookup = {};
+            Object.keys(CONSOLES).forEach(consoleKey => {
+                CONSOLES[consoleKey].categories.forEach(cat => {
+                    cat.games.forEach(g => {
+                        lookup[g.path] = { name: g.name, console: consoleKey };
+                    });
+                });
+            });
+            return lookup;
+        }
 
-        // ── Determine active game ─────────────────────────────────────────────
-        const DEFAULT_PATH = GAME_CATEGORIES[0].games[0].path;
+        const PATH_TO_NAME = buildPathToNameLookup();
+
+        // ── Determine active game and console ─────────────────────────────────
         const params = new URLSearchParams(window.location.search);
-        const activeGame = params.get('game') ? decodeURIComponent(params.get('game')) : DEFAULT_PATH;
-        const activeGameName = PATH_TO_NAME[activeGame] || "NES Game";
+        const requestedGame = params.get('game') ? decodeURIComponent(params.get('game')) : null;
+        const requestedConsole = params.get('console') || 'nes';
 
-        // Update header title
+        // Initialize console and game
+        if (requestedGame && PATH_TO_NAME[requestedGame]) {
+            currentConsole = PATH_TO_NAME[requestedGame].console;
+            currentGame = requestedGame;
+        } else {
+            currentConsole = requestedConsole;
+            currentGame = CONSOLES[currentConsole].defaultGame;
+        }
+
+        const activeGameName = PATH_TO_NAME[currentGame] ? PATH_TO_NAME[currentGame].name : "Game";
+
+        // Update header title and badge
         document.getElementById('current-game-title').textContent = activeGameName;
+        document.getElementById('console-badge').textContent = CONSOLES[currentConsole].name;
+
+        // ── Console selector ──────────────────────────────────────────────────
+        function selectConsole(console) {
+            if (console === currentConsole) {
+                // Just close the selector and show game picker
+                document.getElementById('console-selector').classList.remove('open');
+                document.getElementById('game-picker').classList.add('open');
+                document.getElementById('pick-game-btn').classList.add('active');
+                return;
+            }
+            currentConsole = console;
+            buildPicker();
+            updateControls();
+            document.getElementById('console-selector').classList.remove('open');
+            document.getElementById('game-picker').classList.add('open');
+            document.getElementById('console-badge').textContent = CONSOLES[currentConsole].name;
+        }
+
+        // ── Update Controls Display ──────────────────────────────────────
+        function updateControls() {
+            const controlsGrid = document.getElementById('controls-grid');
+            const controlsTitle = document.getElementById('controls-title');
+            const controls = CONTROLS[currentConsole];
+            
+            controlsTitle.innerHTML = `&#127918; ${CONSOLES[currentConsole].name} Controls`;
+            controlsGrid.innerHTML = '';
+            
+            controls.forEach(ctrl => {
+                const item = document.createElement('div');
+                item.className = 'control-item';
+                item.innerHTML = `<kbd>${ctrl.key}</kbd><span>${ctrl.action}</span>`;
+                controlsGrid.appendChild(item);
+            });
+        }
 
         // ── Build game picker UI ──────────────────────────────────────────────
         function buildPicker() {
             const container = document.getElementById('game-categories');
             container.innerHTML = '';
-            GAME_CATEGORIES.forEach(cat => {
+            const consoleData = CONSOLES[currentConsole];
+            
+            consoleData.categories.forEach(cat => {
                 const section = document.createElement('div');
                 section.className = 'game-category';
                 section.dataset.category = cat.title;
@@ -523,8 +885,8 @@
                     btn.textContent = game.name;
                     btn.dataset.path = game.path;
                     btn.dataset.name = game.name;
-                    if (game.path === activeGame) btn.classList.add('current');
-                    btn.onclick = () => loadGame(game.path);
+                    if (game.path === currentGame) btn.classList.add('current');
+                    btn.onclick = () => loadGame(game.path, currentConsole);
                     list.appendChild(btn);
                 });
 
@@ -535,10 +897,26 @@
 
         function togglePicker() {
             const picker = document.getElementById('game-picker');
+            const selector = document.getElementById('console-selector');
             const btn = document.getElementById('pick-game-btn');
-            const isOpen = picker.classList.toggle('open');
-            btn.classList.toggle('active', isOpen);
-            if (isOpen) document.getElementById('game-search').focus();
+            
+            // If picker is open, close everything
+            if (picker.classList.contains('open')) {
+                picker.classList.remove('open');
+                selector.classList.remove('open');
+                btn.classList.remove('active');
+                return;
+            }
+            
+            // Show console selector first
+            selector.classList.add('open');
+            btn.classList.add('active');
+            
+            // Update console selector buttons to show current console
+            document.querySelectorAll('.console-btn').forEach(btn => {
+                const consoleKey = btn.onclick.toString().match(/selectConsole\('(\w+)'\)/)[1];
+                btn.classList.toggle('current', consoleKey === currentConsole);
+            });
         }
 
         function filterGames(query) {
@@ -554,22 +932,23 @@
             });
         }
 
-        function loadGame(path) {
+        function loadGame(path, console) {
             const url = new URL(window.location.href);
             url.searchParams.set('game', encodeURIComponent(path));
+            url.searchParams.set('console', console);
             window.location.href = url.toString();
         }
 
         buildPicker();
+        updateControls();
 
-        // ── EmulatorJS — Nestopia core supports all NES mappers including MMC2 ──
-        // Touch controls for mobile are provided automatically by EmulatorJS
+        // ── EmulatorJS — Supports NES, GBC, SNES, and N64 cores ────────────────
         EJS_player        = '#game';
-        EJS_core          = 'nes';
-        EJS_gameUrl       = activeGame;
+        EJS_core          = CONSOLES[currentConsole].core;
+        EJS_gameUrl       = currentGame;
         EJS_pathtodata    = 'https://cdn.emulatorjs.org/stable/data/';
         EJS_color         = '#c41e3a';
-        EJS_startOnLoaded = false;
+        EJS_startOnLoaded = true;
     </script>
     <script src="https://cdn.emulatorjs.org/stable/data/loader.js"></script>
 </body>
