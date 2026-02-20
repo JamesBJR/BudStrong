@@ -44,6 +44,7 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 16px;
+            gap: 12px;
         }
         .emulator-header h2 {
             color: #fff;
@@ -51,6 +52,13 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            flex: 1;
+            min-width: 0;
+        }
+        .emulator-header h2 span.game-title-text {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .emulator-header .game-badge {
             background: var(--primary-red);
@@ -60,9 +68,108 @@
             border-radius: 4px;
             text-transform: uppercase;
             letter-spacing: 1px;
+            flex-shrink: 0;
         }
 
-        /* EmulatorJS container — 4:3 aspect ratio, fills the wrapper */
+        .pick-game-btn {
+            background: #2a2a2a;
+            border: 1px solid #555;
+            color: #ddd;
+            padding: 7px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            white-space: nowrap;
+            flex-shrink: 0;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+        }
+        .pick-game-btn:hover {
+            background: #3a3a3a;
+            border-color: #888;
+            color: #fff;
+        }
+        .pick-game-btn.active {
+            background: var(--primary-red);
+            border-color: var(--primary-red);
+            color: #fff;
+        }
+
+        /* Game picker panel */
+        .game-picker {
+            display: none;
+            margin-bottom: 16px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 16px;
+            max-height: 420px;
+            overflow-y: auto;
+        }
+        .game-picker.open {
+            display: block;
+        }
+        .game-picker-search {
+            width: 100%;
+            box-sizing: border-box;
+            background: #222;
+            border: 1px solid #444;
+            border-radius: 8px;
+            color: #fff;
+            padding: 8px 12px;
+            font-size: 0.9rem;
+            margin-bottom: 14px;
+            outline: none;
+        }
+        .game-picker-search::placeholder { color: #666; }
+        .game-picker-search:focus { border-color: #888; }
+
+        .game-category {
+            margin-bottom: 14px;
+        }
+        .game-category-title {
+            color: #888;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 7px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid #2a2a2a;
+        }
+        .game-category-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .game-btn {
+            background: #222;
+            border: 1px solid #3a3a3a;
+            color: #ccc;
+            padding: 5px 11px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: background 0.12s, border-color 0.12s, color 0.12s;
+            text-align: left;
+        }
+        .game-btn:hover {
+            background: #333;
+            border-color: #666;
+            color: #fff;
+        }
+        .game-btn.current {
+            background: var(--primary-red);
+            border-color: var(--primary-red);
+            color: #fff;
+        }
+        .game-category.hidden { display: none; }
+        .game-btn.hidden { display: none; }
+        .game-category-empty-msg {
+            color: #555;
+            font-size: 0.8rem;
+            font-style: italic;
+        }
+
+        /* EmulatorJS container — 4:3 aspect ratio */
         #game {
             width: 100%;
             aspect-ratio: 4 / 3;
@@ -122,6 +229,8 @@
             .games-hero h1 { font-size: 1.8rem; }
             .emulator-wrapper { padding: 12px; border-radius: 12px; }
             .controls-guide { display: none; }
+            .emulator-header h2 { font-size: 1rem; }
+            .pick-game-btn { font-size: 0.8rem; padding: 6px 10px; }
         }
     </style>
 </head>
@@ -157,9 +266,23 @@
         <div class="emulator-wrapper">
             <div class="emulator-header">
                 <h2>
-                    Mike Tyson's Punch-Out!!
+                    <span class="game-title-text" id="current-game-title">Mike Tyson's Punch-Out!!</span>
                     <span class="game-badge">NES</span>
                 </h2>
+                <button class="pick-game-btn" id="pick-game-btn" onclick="togglePicker()">&#127918; Pick a Game</button>
+            </div>
+
+            <!-- Game picker panel -->
+            <div class="game-picker" id="game-picker">
+                <input
+                    class="game-picker-search"
+                    id="game-search"
+                    type="text"
+                    placeholder="Search games..."
+                    oninput="filterGames(this.value)"
+                    autocomplete="off"
+                >
+                <div id="game-categories"></div>
             </div>
 
             <!-- EmulatorJS renders into this div (Nestopia core — full MMC2 support) -->
@@ -173,7 +296,7 @@
                     <div class="control-item"><kbd>X</kbd><span>A Button</span></div>
                     <div class="control-item"><kbd>Enter</kbd><span>Start</span></div>
                     <div class="control-item"><kbd>Shift</kbd><span>Select</span></div>
-                    <div class="control-item"><kbd>F1&nbsp;–&nbsp;F8</kbd><span>Save / Load State</span></div>
+                    <div class="control-item"><kbd>F1&nbsp;&ndash;&nbsp;F8</kbd><span>Save / Load State</span></div>
                 </div>
             </div>
         </div>
@@ -186,11 +309,264 @@
     </footer>
 
     <script>
-        // EmulatorJS — Nestopia core supports all NES mappers including MMC2 (Punch-Out!!)
+        // ── Game Library ─────────────────────────────────────────────────────────
+        // Each entry: { name, path }   (path relative to site root)
+        // Index 0 is always the default game (Mike Tyson's Punch-Out!!)
+        const BASE = "assets/games/All Games/";
+
+        const GAME_CATEGORIES = [
+            {
+                title: "Featured",
+                games: [
+                    { name: "Mike Tyson's Punch-Out!!", path: BASE + "Mike Tyson's Punch-Out!! (Japan, USA) (En) (Rev 1).nes" },
+                ]
+            },
+            {
+                title: "Mario",
+                games: [
+                    { name: "Super Mario Bros.", path: BASE + "Mario/Super Mario Bros. (World).nes" },
+                    { name: "Super Mario Bros. 2", path: BASE + "Mario/Super Mario Bros. 2 (USA) (Rev 1).nes" },
+                    { name: "Super Mario Bros. 3", path: BASE + "Mario/Super Mario Bros. 3 (USA) (Rev 1).nes" },
+                    { name: "Super Mario Bros. – Two Players Hack", path: BASE + "Mario/Super Mario Bros. - Two Players Hack (1.0).nes" },
+                    { name: "SMB1 – Celeste Zap & Dash (Hack)", path: BASE + "Mario/SMB1 - Celeste Mario's Zap & Dash DELUXE! (v2.00c) (w7N).nes" },
+                ]
+            },
+            {
+                title: "Mega Man",
+                games: [
+                    { name: "Mega Man 2", path: BASE + "Mega Man/Mega Man 2 (USA).nes" },
+                    { name: "Mega Man 5", path: BASE + "Mega Man/Mega Man 5 (USA).nes" },
+                    { name: "Mega Man 6", path: BASE + "Mega Man/Mega Man 6 (USA).nes" },
+                ]
+            },
+            {
+                title: "Zelda",
+                games: [
+                    { name: "The Legend of Zelda", path: BASE + "Zelda/Legend of Zelda, The (USA).nes" },
+                    { name: "Zelda II: The Adventure of Link", path: BASE + "Zelda/Zelda II - The Adventure of Link (USA).nes" },
+                ]
+            },
+            {
+                title: "Contra",
+                games: [
+                    { name: "Contra", path: BASE + "Contra/Contra (Japan).nes" },
+                    { name: "Super Contra", path: BASE + "Contra/Super Contra (Japan).nes" },
+                ]
+            },
+            {
+                title: "Disney",
+                games: [
+                    { name: "Chip 'n Dale: Rescue Rangers", path: BASE + "Disney/Chip 'n Dale - Rescue Rangers (USA).nes" },
+                    { name: "Chip 'n Dale: Rescue Rangers 2", path: BASE + "Disney/Chip 'n Dale - Rescue Rangers 2 (USA).nes" },
+                    { name: "DuckTales", path: BASE + "Disney/DuckTales (USA).nes" },
+                    { name: "DuckTales 2", path: BASE + "Disney/DuckTales 2 (USA).nes" },
+                ]
+            },
+            {
+                title: "Ninja Gaiden",
+                games: [
+                    { name: "Ninja Gaiden III: The Ancient Ship of Doom", path: BASE + "Ninja Gaiden/Ninja Gaiden III - The Ancient Ship of Doom (USA).nes" },
+                    { name: "Deadpool (Ninja Gaiden Hack)", path: BASE + "Ninja Gaiden/Deadpool (Ninja Gaiden Hack) (Techmoon) (140.0).nes" },
+                ]
+            },
+            {
+                title: "Kunio-kun / River City",
+                games: [
+                    { name: "River City Ransom", path: BASE + "Kunio-kun (mostly sports)/River City Ransom (USA).nes" },
+                    { name: "Super Dodge Ball", path: BASE + "Kunio-kun (mostly sports)/Super Dodge Ball (USA).nes" },
+                    { name: "Crash 'n' the Boys: Street Challenge", path: BASE + "Kunio-kun (mostly sports)/Crash 'n' the Boys - Street Challenge (USA).nes" },
+                    { name: "Nekketsu Kakutou Densetsu", path: BASE + "Kunio-kun (mostly sports)/Nekketsu Kakutou Densetsu (Japan).nes" },
+                    { name: "Nekketsu Street Basket", path: BASE + "Kunio-kun (mostly sports)/Nekketsu! Street Basket - Ganbare Dunk Heroes (Japan).nes" },
+                    { name: "Nekketsu Hockey-bu", path: BASE + "Kunio-kun (mostly sports)/Ike Ike! Nekketsu Hockey-bu - Subette Koronde Dairantou (Japan).nes" },
+                    { name: "Kunio-kun no Nekketsu Soccer League", path: BASE + "Kunio-kun (mostly sports)/Kunio-kun no Nekketsu Soccer League (Japan).nes" },
+                    { name: "Downtown Special: Kunio-kun no Jidaigeki", path: BASE + "Kunio-kun (mostly sports)/Downtown Special - Kunio-kun no Jidaigeki Da yo Zenin Shuugou! (Japan).nes" },
+                ]
+            },
+            {
+                title: "Sports",
+                games: [
+                    { name: "Tecmo Super Bowl", path: BASE + "Sports/Tecmo Super Bowl (USA).nes" },
+                    { name: "Blades of Steel", path: BASE + "Sports/Blades of Steel (USA).nes" },
+                    { name: "Double Dribble", path: BASE + "Sports/Double Dribble (USA) (Rev 1).nes" },
+                    { name: "Ice Hockey", path: BASE + "Sports/Ice Hockey (USA).nes" },
+                    { name: "Super Spike V'Ball", path: BASE + "Sports/Super Spike V'Ball (USA).nes" },
+                    { name: "Track & Field", path: BASE + "Sports/Track & Field (USA).nes" },
+                    { name: "Golf", path: BASE + "Sports/Golf (Japan) (En).nes" },
+                    { name: "Tennis", path: BASE + "Sports/Tennis (Japan, USA) (En).nes" },
+                    { name: "Softball Tengoku", path: BASE + "Sports/Softball Tengoku (Japan).nes" },
+                    { name: "Captain Tsubasa II: Super Striker", path: BASE + "Sports/Captain Tsubasa II - Super Striker (Japan).nes" },
+                ]
+            },
+            {
+                title: "2-Player Games",
+                games: [
+                    { name: "Shadow of the Ninja", path: BASE + "Play these games two player!/Shadow of the Ninja (USA).nes" },
+                    { name: "Ninja Crusaders", path: BASE + "Play these games two player!/Ninja Crusaders (USA).nes" },
+                ]
+            },
+            {
+                title: "Action / Adventure",
+                games: [
+                    { name: "Castlevania", path: BASE + "Castlevania (USA) (Rev 1).nes" },
+                    { name: "Metroid", path: BASE + "Metroid (USA).nes" },
+                    { name: "Bionic Commando", path: BASE + "Bionic Commando (USA).nes" },
+                    { name: "Little Samson", path: BASE + "Little Samson (USA).nes" },
+                    { name: "Metal Storm", path: BASE + "Metal Storm (USA).nes" },
+                    { name: "KickMaster", path: BASE + "KickMaster (USA).nes" },
+                    { name: "Shatterhand", path: BASE + "Shatterhand (USA).nes" },
+                    { name: "Power Blade", path: BASE + "Power Blade (USA).nes" },
+                    { name: "Gargoyle's Quest II", path: BASE + "Gargoyle's Quest II (USA).nes" },
+                    { name: "Vice: Project Doom", path: BASE + "Vice - Project Doom (USA).nes" },
+                    { name: "Mighty Final Fight", path: BASE + "Mighty Final Fight (USA).nes" },
+                    { name: "Double Dragon II: The Revenge", path: BASE + "Double Dragon II - The Revenge (USA) (Rev 1).nes" },
+                    { name: "TMNT III: The Manhattan Project", path: BASE + "Teenage Mutant Ninja Turtles III - The Manhattan Project (USA).nes" },
+                    { name: "G.I. Joe: A Real American Hero", path: BASE + "G.I. Joe - A Real American Hero (USA).nes" },
+                    { name: "Jackal", path: BASE + "Jackal (USA).nes" },
+                    { name: "Guerrilla War", path: BASE + "Guerrilla War (USA).nes" },
+                    { name: "Rampage", path: BASE + "Rampage (USA).nes" },
+                    { name: "Adventure Island 3", path: BASE + "Adventure Island 3 (USA).nes" },
+                    { name: "The Legend of Kage", path: BASE + "Legend of Kage, The (USA).nes" },
+                    { name: "Rockin' Kats", path: BASE + "Rockin' Kats (USA).nes" },
+                ]
+            },
+            {
+                title: "Arcade Classics",
+                games: [
+                    { name: "Donkey Kong", path: BASE + "Donkey Kong (World) (Rev 1).nes" },
+                    { name: "Excitebike", path: BASE + "Excitebike (Japan, USA) (En).nes" },
+                    { name: "Ice Climber", path: BASE + "Ice Climber (Japan) (En).nes" },
+                    { name: "Balloon Fight", path: BASE + "Balloon Fight (Japan) (En).nes" },
+                    { name: "Popeye", path: BASE + "Popeye (World) (Rev 1).nes" },
+                    { name: "Mappy", path: BASE + "Mappy (Japan) (En).nes" },
+                    { name: "Circus Charlie", path: BASE + "Circus Charlie (Japan) (En).nes" },
+                    { name: "BattleCity", path: BASE + "BattleCity (Japan) (En).nes" },
+                    { name: "Paperboy", path: BASE + "Paperboy (USA).nes" },
+                    { name: "Pinball", path: BASE + "Pinball (Japan, USA) (En).nes" },
+                    { name: "Gun.Smoke", path: BASE + "Gun.Smoke (USA).nes" },
+                    { name: "Road Fighter", path: BASE + "Road Fighter (Japan) (En).nes" },
+                    { name: "Pro Wrestling", path: BASE + "Pro Wrestling (USA).nes" },
+                    { name: "Spelunker", path: BASE + "Spelunker (USA).nes" },
+                    { name: "Kung Fu", path: BASE + "Kung Fu (Japan, USA) (En).nes" },
+                    { name: "Yie Ar Kung-Fu", path: BASE + "Yie Ar Kung-Fu (Japan) (En) (Rev 1.4).nes" },
+                    { name: "Tetris (Tengen)", path: BASE + "Tetris (USA) (Tengen) (Unl).nes" },
+                ]
+            },
+            {
+                title: "Hidden Gems",
+                games: [
+                    { name: "Kirby's Adventure", path: BASE + "Kirby's Adventure (USA) (Rev 1).nes" },
+                    { name: "Gimmick!", path: BASE + "Gimmick! (Japan) (En).nes" },
+                    { name: "Gun Nac", path: BASE + "Gun Nac (USA).nes" },
+                    { name: "Fire 'n Ice", path: BASE + "Fire 'n Ice (USA).nes" },
+                    { name: "Bubble Bobble", path: BASE + "Bubble Bobble (USA).nes" },
+                    { name: "Panic Restaurant", path: BASE + "Panic Restaurant (USA).nes" },
+                    { name: "Felix the Cat", path: BASE + "Felix the Cat (USA) (Hudson).nes" },
+                    { name: "Hammerin' Harry", path: BASE + "Hammerin' Harry (Europe).nes" },
+                    { name: "Cowboy Kid", path: BASE + "Cowboy Kid (USA).nes" },
+                    { name: "Maniac Mansion", path: BASE + "Maniac Mansion (USA).nes" },
+                    { name: "Princess Tomato in the Salad Kingdom", path: BASE + "Princess Tomato in the Salad Kingdom (USA).nes" },
+                    { name: "Rescue: The Embassy Mission", path: BASE + "Rescue - The Embassy Mission (USA).nes" },
+                    { name: "Hebereke", path: BASE + "Hebereke (Japan).nes" },
+                    { name: "Bio Miracle Bokutte Upa", path: BASE + "Bio Miracle Bokutte Upa (Japan).nes" },
+                    { name: "Cat Ninden Teyandee", path: BASE + "Cat Ninden Teyandee (Japan).nes" },
+                    { name: "Chou-Wakusei Senki (MetaFight)", path: BASE + "Chou-Wakusei Senki - MetaFight (Japan) (En).nes" },
+                    { name: "Mitsume ga Tooru", path: BASE + "Mitsume ga Tooru (Japan).nes" },
+                    { name: "Splatterhouse: Wanpaku Graffiti", path: BASE + "Splatterhouse - Wanpaku Graffiti (Japan).nes" },
+                    { name: "The Flintstones: Surprise at Dinosaur Peak", path: BASE + "Flintstones, The - The Surprise at Dinosaur Peak! (USA).nes" },
+                    { name: "Ivan 'Ironman' Stewart's Super Off Road", path: BASE + "Ivan 'Ironman' Stewart's Super Off Road (USA).nes" },
+                    { name: "Kekkyoku Nankyoku Daibouken", path: BASE + "Kekkyoku Nankyoku Daibouken (Japan) (Rev 1).nes" },
+                ]
+            },
+            {
+                title: "Zapper Games (light gun)",
+                games: [
+                    { name: "Duck Hunt", path: BASE + "Zapper/Duck Hunt (World).nes" },
+                    { name: "Hogan's Alley", path: BASE + "Zapper/Hogan's Alley (World).nes" },
+                    { name: "Wild Gunman", path: BASE + "Zapper/Wild Gunman (World) (Rev 1).nes" },
+                ]
+            },
+        ];
+
+        // Flatten to a lookup: path -> name
+        const PATH_TO_NAME = {};
+        GAME_CATEGORIES.forEach(cat => cat.games.forEach(g => { PATH_TO_NAME[g.path] = g.name; }));
+
+        // ── Determine active game ─────────────────────────────────────────────
+        const DEFAULT_PATH = GAME_CATEGORIES[0].games[0].path;
+        const params = new URLSearchParams(window.location.search);
+        const activeGame = params.get('game') ? decodeURIComponent(params.get('game')) : DEFAULT_PATH;
+        const activeGameName = PATH_TO_NAME[activeGame] || "NES Game";
+
+        // Update header title
+        document.getElementById('current-game-title').textContent = activeGameName;
+
+        // ── Build game picker UI ──────────────────────────────────────────────
+        function buildPicker() {
+            const container = document.getElementById('game-categories');
+            container.innerHTML = '';
+            GAME_CATEGORIES.forEach(cat => {
+                const section = document.createElement('div');
+                section.className = 'game-category';
+                section.dataset.category = cat.title;
+
+                const title = document.createElement('div');
+                title.className = 'game-category-title';
+                title.textContent = cat.title;
+                section.appendChild(title);
+
+                const list = document.createElement('div');
+                list.className = 'game-category-list';
+
+                cat.games.forEach(game => {
+                    const btn = document.createElement('button');
+                    btn.className = 'game-btn';
+                    btn.textContent = game.name;
+                    btn.dataset.path = game.path;
+                    btn.dataset.name = game.name;
+                    if (game.path === activeGame) btn.classList.add('current');
+                    btn.onclick = () => loadGame(game.path);
+                    list.appendChild(btn);
+                });
+
+                section.appendChild(list);
+                container.appendChild(section);
+            });
+        }
+
+        function togglePicker() {
+            const picker = document.getElementById('game-picker');
+            const btn = document.getElementById('pick-game-btn');
+            const isOpen = picker.classList.toggle('open');
+            btn.classList.toggle('active', isOpen);
+            if (isOpen) document.getElementById('game-search').focus();
+        }
+
+        function filterGames(query) {
+            const q = query.trim().toLowerCase();
+            document.querySelectorAll('.game-category').forEach(section => {
+                let anyVisible = false;
+                section.querySelectorAll('.game-btn').forEach(btn => {
+                    const match = !q || btn.dataset.name.toLowerCase().includes(q);
+                    btn.classList.toggle('hidden', !match);
+                    if (match) anyVisible = true;
+                });
+                section.classList.toggle('hidden', !anyVisible);
+            });
+        }
+
+        function loadGame(path) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('game', encodeURIComponent(path));
+            window.location.href = url.toString();
+        }
+
+        buildPicker();
+
+        // ── EmulatorJS — Nestopia core supports all NES mappers including MMC2 ──
         // Touch controls for mobile are provided automatically by EmulatorJS
         EJS_player        = '#game';
         EJS_core          = 'nes';
-        EJS_gameUrl       = "assets/games/Mike Tyson's Punch-Out!! (USA) (Rev-A).nes";
+        EJS_gameUrl       = activeGame;
         EJS_pathtodata    = 'https://cdn.emulatorjs.org/stable/data/';
         EJS_color         = '#c41e3a';
         EJS_startOnLoaded = false;
